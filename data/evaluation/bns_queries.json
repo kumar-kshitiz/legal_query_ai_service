@@ -1,0 +1,22 @@
+[
+  {
+    "query": "What is the punishment for murder?",
+    "expected_section": "103"
+  },
+  {
+    "query": "What happens if someone causes death by negligence?",
+    "expected_section": "106"
+  },
+  {
+    "query": "What is the punishment for attempt to murder?",
+    "expected_section": "109"
+  },
+  {
+    "query": "What is the law for theft?",
+    "expected_section": "303"
+  },
+  {
+    "query": "What is criminal intimidation?",
+    "expected_section": "351"
+  }
+]

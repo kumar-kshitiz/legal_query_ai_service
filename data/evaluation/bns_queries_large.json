@@ -1,0 +1,122 @@
+[
+  {
+    "query": "What does the law say about punishment for intentionally running vessel aground or ashore with intent to commit\ntheft, etc?",
+    "expected_section": "328"
+  },
+  {
+    "query": "What does the law say about concealing design to commit offence punishable with death or imprisonment for life?",
+    "expected_section": "58"
+  },
+  {
+    "query": "What does the law say about enhanced punishment for certain offences after previous conviction?",
+    "expected_section": "13"
+  },
+  {
+    "query": "What does the law say about importation of girl or boy from foreign country?",
+    "expected_section": "141"
+  },
+  {
+    "query": "What does the law say about wrongful restraint?",
+    "expected_section": "126"
+  },
+  {
+    "query": "What does the law say about voluntarily causing hurt?",
+    "expected_section": "115"
+  },
+  {
+    "query": "What does the law say about disclosure of identity of victim of certain offences, etc?",
+    "expected_section": "72"
+  },
+  {
+    "query": "What does the law say about liability of abettor for an effect caused by act abetted different from that intended by\nabettor?",
+    "expected_section": "53"
+  },
+  {
+    "query": "What does the law say about counterfeiting a property mark?",
+    "expected_section": "347"
+  },
+  {
+    "query": "What does the law say about making atmosphere noxious to health?",
+    "expected_section": "280"
+  },
+  {
+    "query": "What does the law say about abetment of a thing?",
+    "expected_section": "45"
+  },
+  {
+    "query": "What does the law say about theft?",
+    "expected_section": "303"
+  },
+  {
+    "query": "What does the law say about false information, with intent to cause public servant to use his lawful power to injury of\nanother person?",
+    "expected_section": "217"
+  },
+  {
+    "query": "What does the law say about act done by a person justified, or by mistake of fact believing himself justified, by law?",
+    "expected_section": "17"
+  },
+  {
+    "query": "What does the law say about act done pursuant to judgment or order of court?",
+    "expected_section": "16"
+  },
+  {
+    "query": "What does the law say about abetment outside india for offence in india?",
+    "expected_section": "48"
+  },
+  {
+    "query": "What does the law say about petty organised crime?",
+    "expected_section": "112"
+  },
+  {
+    "query": "What does the law say about voluntarily causing hurt or grievous hurt to extort confession, or to compel restoration of\nproperty?",
+    "expected_section": "120"
+  },
+  {
+    "query": "What does the law say about intentional omission to apprehend on part of public servant bound to apprehend?",
+    "expected_section": "259"
+  },
+  {
+    "query": "What does the law say about robbery?",
+    "expected_section": "309"
+  },
+  {
+    "query": "What does the law say about act done by a person bound, or by mistake of fact believing himself bound, by law?",
+    "expected_section": "14"
+  },
+  {
+    "query": "What does the law say about negligent conduct with respect to explosive substance?",
+    "expected_section": "288"
+  },
+  {
+    "query": "What does the law say about culpable homicide by causing death of person other than person whose death was\nintended?",
+    "expected_section": "102"
+  },
+  {
+    "query": "What does the law say about house-trespass after preparation for hurt, assault or wrongful restraint?",
+    "expected_section": "333"
+  },
+  {
+    "query": "What does the law say about refusing to sign statement?",
+    "expected_section": "215"
+  },
+  {
+    "query": "What does the law say about terrorist act?",
+    "expected_section": "113"
+  },
+  {
+    "query": "What does the law say about giving or fabricating false evidence with intent to procure conviction of capital offence?",
+    "expected_section": "230"
+  },
+  {
+    "query": "What does the law say about uttering words, etc., with deliberate intent to wound religious feelings of any person?",
+    "expected_section": "302"
+  },
+  {
+    "query": "What does the law say about trafficking of person?",
+    "expected_section": "143"
+  },
+  {
+    "query": "What does the law say about punishments?",
+    "expected_section": "4"
+  }
+]

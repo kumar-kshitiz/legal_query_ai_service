@@ -1,0 +1,42 @@
+[
+  {
+    "query": "A person intentionally kills another person. What punishment can they face?",
+    "expected_section": "103"
+  },
+  {
+    "query": "Someone dies because of another person's rash and careless act. Which provision may apply?",
+    "expected_section": "106"
+  },
+  {
+    "query": "A person shoots at someone intending to kill them, but the victim survives. Which provision applies?",
+    "expected_section": "109"
+  },
+  {
+    "query": "Someone secretly takes another person's mobile phone without permission intending to keep it. Which provision applies?",
+    "expected_section": "303"
+  },
+  {
+    "query": "A person threatens to physically harm someone in order to frighten them. Which provision covers this?",
+    "expected_section": "351"
+  },
+  {
+    "query": "A man uses force against a woman intending to violate her modesty. Which provision applies?",
+    "expected_section": "74"
+  },
+  {
+    "query": "A man makes unwanted sexual advances and demands sexual favours from a woman. Which provision applies?",
+    "expected_section": "75"
+  },
+  {
+    "query": "Someone attacks a woman intending to force her clothes off. Which provision applies?",
+    "expected_section": "76"
+  },
+  {
+    "query": "Someone secretly records a woman during a private act and shares the recording. Which provision applies?",
+    "expected_section": "77"
+  },
+  {
+    "query": "Someone deceives another person with false claims and dishonestly gets money from them. Which provision applies?",
+    "expected_section": "318"
+  }
+]
