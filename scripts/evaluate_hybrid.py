@@ -1,16 +1,22 @@
 import json
 
-from app.retrieval.hybrid_retriever import HybridLegalRetriever
+from app.retrieval.hybrid_retriever import (
+    HybridLegalRetriever
+)
 
 
-path = "data/evaluation/bns_queries_realistic.json"
+PATH = (
+    "data/evaluation/"
+    "bns_queries_realistic.json"
+)
 
 
 with open(
-    path,
+    PATH,
     "r",
     encoding="utf-8"
 ) as f:
+
     tests = json.load(f)
 
 
@@ -21,6 +27,11 @@ top1 = 0
 top3 = 0
 top5 = 0
 
+original_top1 = 0
+
+improved = 0
+regressed = 0
+
 
 print(
     "Total benchmark queries:",
@@ -30,42 +41,63 @@ print(
 
 for test in tests:
 
-    q = test["query"]
+    query = test[
+        "query"
+    ]
+
 
     expected = str(
-        test["expected_section"]
+        test[
+            "expected_section"
+        ]
     )
 
 
     results = retriever.search(
-        q,
-        limit=5
+
+        query,
+
+        limit=5,
+
+        disambiguate=True
     )
 
 
     sections = [
-        str(r["section"])
-        for r in results
+
+        str(
+            result[
+                "section"
+            ]
+        )
+
+        for result
+        in results
     ]
 
 
-    # -------------------------
-    # Metrics
-    # -------------------------
+    # ==============================================
+    # New metrics
+    # ==============================================
 
     if expected in sections[:1]:
+
         top1 += 1
 
+
     if expected in sections[:3]:
+
         top3 += 1
 
+
     if expected in sections[:5]:
+
         top5 += 1
 
 
-    # -------------------------
-    # Find correct rank
-    # -------------------------
+    # ==============================================
+    # New rank
+    # ==============================================
 
     rank = None
 
@@ -76,27 +108,115 @@ for test in tests:
     ):
 
         if section == expected:
+
             rank = i
+
             break
 
 
-    # -------------------------
-    # Print only weak cases
-    # -------------------------
+    # ==============================================
+    # Original rank before disambiguation
+    # ==============================================
 
-    if rank != 1:
+    original_rank = None
 
-        print("\n-------------------------")
+
+    for result in results:
+
+        section = str(
+            result[
+                "section"
+            ]
+        )
+
+
+        if section == expected:
+
+            original_rank = (
+                result.get(
+                    "original_rank"
+                )
+            )
+
+            break
+
+
+    # Candidates outside top3 do not have
+    # original_rank attached.
+    if (
+        original_rank is None
+        and
+        rank is not None
+        and
+        rank > 3
+    ):
+
+        original_rank = rank
+
+
+    if original_rank == 1:
+
+        original_top1 += 1
+
+
+    # ==============================================
+    # Improvement / regression tracking
+    # ==============================================
+
+    if (
+        original_rank is not None
+        and
+        rank is not None
+    ):
+
+        if rank < original_rank:
+
+            improved += 1
+
+
+        elif rank > original_rank:
+
+            regressed += 1
+
+
+    # ==============================================
+    # Print interesting cases
+    # ==============================================
+
+    if (
+        rank != 1
+        or
+        original_rank != rank
+    ):
+
+        print(
+            "\n--------------------------------"
+        )
+
 
         print(
             "Query:",
-            q
+            query
         )
+
 
         print(
             "Expected:",
             expected
         )
+
+
+        print(
+            "Original rank:",
+            original_rank
+        )
+
+
+        print(
+            "New rank:",
+            rank
+        )
+
 
         print(
             "\nTop results:"
@@ -111,11 +231,40 @@ for test in tests:
             print(
                 i,
                 "Section:",
-                result["section"],
-                "Rerank score:",
+                result[
+                    "section"
+                ],
+                "| Cross:",
                 round(
                     result.get(
-                        "rerank_score",
+                        "original_rerank_score",
+                        result.get(
+                            "rerank_score",
+                            0
+                        )
+                    ),
+                    4
+                ),
+                "| Heading:",
+                round(
+                    result.get(
+                        "heading_score",
+                        0
+                    ),
+                    4
+                ),
+                "| Short:",
+                round(
+                    result.get(
+                        "short_score",
+                        0
+                    ),
+                    4
+                ),
+                "| Final:",
+                round(
+                    result.get(
+                        "disambiguation_score",
                         0
                     ),
                     4
@@ -123,41 +272,36 @@ for test in tests:
             )
 
 
-        print(
-            "Correct section rank:",
-            rank
-        )
-
-
-        if rank is None:
-
-            print(
-                "❌ NOT FOUND"
-            )
-
-        else:
-
-            print(
-                "⚠️ NEEDS IMPROVEMENT"
-            )
-
-
-# -------------------------
+# ==============================================
 # Final metrics
-# -------------------------
+# ==============================================
 
-n = len(tests)
-
-
-print(
-    "\n===== HYBRID RETRIEVAL EVALUATION ====="
+n = len(
+    tests
 )
 
 
 print(
-    "Top-1 Accuracy:",
+    "\n===================================="
+)
+
+print(
+    "HYBRID + LEGAL DISAMBIGUATION"
+)
+
+print(
+    "===================================="
+)
+
+
+print(
+    "Original Top-1:",
     round(
-        top1 / n * 100,
+        original_top1
+        /
+        n
+        *
+        100,
         2
     ),
     "%"
@@ -165,9 +309,13 @@ print(
 
 
 print(
-    "Top-3 Accuracy:",
+    "New Top-1:",
     round(
-        top3 / n * 100,
+        top1
+        /
+        n
+        *
+        100,
         2
     ),
     "%"
@@ -175,10 +323,40 @@ print(
 
 
 print(
-    "Top-5 Accuracy:",
+    "Top-3:",
     round(
-        top5 / n * 100,
+        top3
+        /
+        n
+        *
+        100,
         2
     ),
     "%"
+)
+
+
+print(
+    "Top-5:",
+    round(
+        top5
+        /
+        n
+        *
+        100,
+        2
+    ),
+    "%"
+)
+
+
+print(
+    "Queries improved:",
+    improved
+)
+
+
+print(
+    "Queries regressed:",
+    regressed
 )

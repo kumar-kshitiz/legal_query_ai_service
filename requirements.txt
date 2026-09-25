@@ -3,3 +3,4 @@ uvicorn[standard]
 pymupdf
 sentence-transformers
 numpy
+rank-bm25
