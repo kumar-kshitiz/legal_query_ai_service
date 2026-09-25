@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
 
+from threading import Lock
+
 from fastapi import (
     FastAPI,
     HTTPException,
@@ -12,18 +14,73 @@ from app.retrieval.safe_hybrid_retriever import (
     LegalKnowledgeUnavailableError,
 )
 
+from app.triage.query_triage import (
+    LegalQueryTriage,
+    QueryRoute,
+)
+
+from app.triage.escalation_builder import (
+    EscalationBuilder,
+)
+
+from app.rag.legal_answer_generator import (
+    LegalAnswerGenerator,
+)
+
 
 # ==================================================
-# Global retriever
+# Global components
 # ==================================================
 
 retriever = None
 
+triage_engine = None
+
+escalation_builder = None
+
+answer_generator = None
+
+generator_lock = Lock()
+
 
 # ==================================================
-# App lifespan
-#
-# Loads embedding model + cross encoder only once.
+# Lazy-load RAG model
+# ==================================================
+
+def get_answer_generator():
+
+    global answer_generator
+
+
+    if answer_generator is None:
+
+        with generator_lock:
+
+            if answer_generator is None:
+
+                print(
+                    "\n===================================="
+                )
+
+                print(
+                    "LOADING LEGAL ANSWER MODEL"
+                )
+
+                print(
+                    "===================================="
+                )
+
+
+                answer_generator = (
+                    LegalAnswerGenerator()
+                )
+
+
+    return answer_generator
+
+
+# ==================================================
+# Lifespan
 # ==================================================
 
 @asynccontextmanager
@@ -32,6 +89,8 @@ async def lifespan(
 ):
 
     global retriever
+    global triage_engine
+    global escalation_builder
 
 
     print(
@@ -39,7 +98,7 @@ async def lifespan(
     )
 
     print(
-        "LOADING LEGAL RETRIEVAL SYSTEM"
+        "LOADING LEGAL INTELLIGENCE SERVICE"
     )
 
     print(
@@ -52,8 +111,30 @@ async def lifespan(
     )
 
 
+    triage_engine = (
+        LegalQueryTriage()
+    )
+
+
+    escalation_builder = (
+        EscalationBuilder()
+    )
+
+
     print(
-        "\n✅ Legal retrieval system ready."
+        "\n✅ Retrieval system ready."
+    )
+
+    print(
+        "✅ Triage engine ready."
+    )
+
+    print(
+        "✅ Escalation builder ready."
+    )
+
+    print(
+        "ℹ️ RAG model will load lazily."
     )
 
 
@@ -66,21 +147,21 @@ async def lifespan(
 
 
 # ==================================================
-# FastAPI app
+# FastAPI
 # ==================================================
 
 app = FastAPI(
 
     title="Legal Intelligence Service",
 
-    version="1.0.0",
+    version="2.2.0",
 
     lifespan=lifespan,
 )
 
 
 # ==================================================
-# Request model
+# Request models
 # ==================================================
 
 class SearchRequest(
@@ -92,65 +173,33 @@ class SearchRequest(
     limit: int = 5
 
 
-# ==================================================
-# Root
-# ==================================================
-
-@app.get("/")
-def root():
-
-    return {
-
-        "service":
-            "Legal Intelligence Service",
-
-        "status":
-            "running"
-    }
-
-
-# ==================================================
-# Health
-# ==================================================
-
-@app.get("/health")
-def health():
-
-    return {
-
-        "status":
-            "ready",
-
-        "retriever_loaded":
-            retriever is not None
-    }
-
-
-# ==================================================
-# Search
-# ==================================================
-
-@app.post("/search")
-def search(
-    request: SearchRequest
+class AnalyzeRequest(
+    BaseModel
 ):
 
-    if retriever is None:
+    query: str
 
-        raise HTTPException(
-
-            status_code=503,
-
-            detail=(
-                "Legal retrieval system "
-                "is not ready."
-            )
-        )
+    limit: int = 5
 
 
-    query = (
-        request.query.strip()
-    )
+class ResolveRequest(
+    BaseModel
+):
+
+    query: str
+
+    limit: int = 3
+
+
+# ==================================================
+# Helpers
+# ==================================================
+
+def validate_query(
+    query: str
+) -> str:
+
+    query = query.strip()
 
 
     if not query:
@@ -159,50 +208,60 @@ def search(
 
             status_code=400,
 
-            detail=(
-                "Query cannot be empty."
-            )
+            detail="Query cannot be empty."
         )
 
 
-    limit = max(
+    return query
+
+
+def normalize_limit(
+    limit: int
+) -> int:
+
+    return max(
         1,
         min(
-            request.limit,
+            limit,
             10
         )
     )
 
 
-    try:
+def serialize_triage(
+    decision
+):
 
-        results = (
-            retriever.search(
+    return {
 
-                query,
+        "route":
+            decision.route.value,
 
-                limit=limit
-            )
-        )
+        "confidence":
+            decision.confidence,
+
+        "sensitive":
+            decision.sensitive,
+
+        "urgent":
+            decision.urgent,
+
+        "ambiguous":
+            decision.ambiguous,
+
+        "complex":
+            decision.complex,
+
+        "reasons":
+            decision.reasons,
+    }
 
 
-    except LegalKnowledgeUnavailableError as e:
+def serialize_results(
+    results
+):
 
-        raise HTTPException(
-
-            status_code=503,
-
-            detail={
-                "error":
-                    "legal_source_unavailable",
-
-                "message":
-                    str(e)
-            }
-        )
-
-
-    response_results = []
+    output = []
 
 
     for rank, result in enumerate(
@@ -222,7 +281,7 @@ def search(
         )
 
 
-        response_results.append({
+        output.append({
 
             "rank":
                 rank,
@@ -301,16 +360,563 @@ def search(
         })
 
 
+    return output
+
+
+# ==================================================
+# Root
+# ==================================================
+
+@app.get("/")
+def root():
+
+    return {
+
+        "service":
+            "Legal Intelligence Service",
+
+        "version":
+            "2.2.0",
+
+        "status":
+            "running",
+    }
+
+
+# ==================================================
+# Health
+# ==================================================
+
+@app.get("/health")
+def health():
+
+    return {
+
+        "status":
+            "ready",
+
+        "retriever_loaded":
+            retriever is not None,
+
+        "triage_loaded":
+            triage_engine is not None,
+
+        "escalation_builder_loaded":
+            escalation_builder is not None,
+
+        "rag_loaded":
+            answer_generator is not None,
+    }
+
+
+# ==================================================
+# Search
+# ==================================================
+
+@app.post("/search")
+def search(
+    request: SearchRequest
+):
+
+    query = validate_query(
+        request.query
+    )
+
+
+    limit = normalize_limit(
+        request.limit
+    )
+
+
+    try:
+
+        results = retriever.search(
+            query,
+            limit=limit
+        )
+
+
+    except LegalKnowledgeUnavailableError as e:
+
+        raise HTTPException(
+
+            status_code=503,
+
+            detail={
+                "error":
+                    "legal_source_unavailable",
+
+                "message":
+                    str(e)
+            }
+        )
+
+
     return {
 
         "query":
             query,
 
         "count":
-            len(
-                response_results
+            len(results),
+
+        "results":
+            serialize_results(
+                results
+            ),
+    }
+
+
+# ==================================================
+# Analyze
+# ==================================================
+
+@app.post("/analyze")
+def analyze(
+    request: AnalyzeRequest
+):
+
+    query = validate_query(
+        request.query
+    )
+
+
+    limit = normalize_limit(
+        request.limit
+    )
+
+
+    pre = triage_engine.classify(
+
+        query,
+
+        retrieval_results=None
+    )
+
+
+    if pre.route == QueryRoute.HUMAN:
+
+        return {
+
+            "query":
+                query,
+
+            "route":
+                "human",
+
+            "retrieval_performed":
+                False,
+
+            "triage":
+                serialize_triage(
+                    pre
+                ),
+
+            "results":
+                [],
+        }
+
+
+    try:
+
+        results = retriever.search(
+
+            query,
+
+            limit=limit
+        )
+
+
+    except LegalKnowledgeUnavailableError as e:
+
+        raise HTTPException(
+
+            status_code=503,
+
+            detail={
+                "error":
+                    "legal_source_unavailable",
+
+                "message":
+                    str(e)
+            }
+        )
+
+
+    final = triage_engine.classify(
+
+        query,
+
+        retrieval_results=results
+    )
+
+
+    return {
+
+        "query":
+            query,
+
+        "route":
+            final.route.value,
+
+        "retrieval_performed":
+            True,
+
+        "triage":
+            serialize_triage(
+                final
             ),
 
         "results":
-            response_results
+            serialize_results(
+                results
+            ),
+    }
+
+
+# ==================================================
+# Resolve
+# ==================================================
+
+@app.post("/resolve")
+def resolve(
+    request: ResolveRequest
+):
+
+    query = validate_query(
+        request.query
+    )
+
+
+    limit = normalize_limit(
+        request.limit
+    )
+
+
+    # ==============================================
+    # 1. PRE-TRIAGE
+    # ==============================================
+
+    pre_triage = triage_engine.classify(
+
+        query,
+
+        retrieval_results=None
+    )
+
+
+    if pre_triage.route == QueryRoute.HUMAN:
+
+        escalation = (
+            escalation_builder.build(
+
+                query=query,
+
+                stage="pre_triage",
+
+                triage=pre_triage,
+
+                retrieval_results=[]
+            )
+        )
+
+
+        return {
+
+            "query":
+                query,
+
+            "route":
+                "human",
+
+            "stage":
+                "pre_triage",
+
+            "retrieval_performed":
+                False,
+
+            "answer_generated":
+                False,
+
+            "triage":
+                serialize_triage(
+                    pre_triage
+                ),
+
+            "answer":
+                None,
+
+            "citations":
+                [],
+
+            "results":
+                [],
+
+            "escalation":
+                escalation,
+
+            "action":
+                (
+                    "Forward escalation payload "
+                    "to Node.js/MongoDB."
+                )
+        }
+
+
+    # ==============================================
+    # 2. RETRIEVAL
+    # ==============================================
+
+    try:
+
+        results = retriever.search(
+
+            query,
+
+            limit=limit
+        )
+
+
+    except LegalKnowledgeUnavailableError as e:
+
+        raise HTTPException(
+
+            status_code=503,
+
+            detail={
+                "error":
+                    "legal_source_unavailable",
+
+                "message":
+                    str(e)
+            }
+        )
+
+
+    # ==============================================
+    # 3. RETRIEVAL-AWARE TRIAGE
+    # ==============================================
+
+    final_triage = triage_engine.classify(
+
+        query,
+
+        retrieval_results=results
+    )
+
+
+    serialized_results = (
+        serialize_results(
+            results
+        )
+    )
+
+
+    if final_triage.route == QueryRoute.HUMAN:
+
+        escalation = (
+            escalation_builder.build(
+
+                query=query,
+
+                stage="retrieval_triage",
+
+                triage=final_triage,
+
+                retrieval_results=results
+            )
+        )
+
+
+        return {
+
+            "query":
+                query,
+
+            "route":
+                "human",
+
+            "stage":
+                "retrieval_triage",
+
+            "retrieval_performed":
+                True,
+
+            "answer_generated":
+                False,
+
+            "triage":
+                serialize_triage(
+                    final_triage
+                ),
+
+            "answer":
+                None,
+
+            "citations":
+                [],
+
+            "results":
+                serialized_results,
+
+            "escalation":
+                escalation,
+
+            "action":
+                (
+                    "Forward escalation payload "
+                    "with retrieved provisions "
+                    "to Node.js/MongoDB."
+                )
+        }
+
+
+    # ==============================================
+    # 4. GROUNDED RAG
+    # ==============================================
+
+    generator = (
+        get_answer_generator()
+    )
+
+
+    generated = generator.generate(
+
+        query,
+
+        results
+    )
+
+
+    # ==============================================
+    # 5. RAG ABSTENTION
+    # ==============================================
+
+    if generated.get(
+        "needs_human_review",
+        True
+    ):
+
+        escalation = (
+            escalation_builder.build(
+
+                query=query,
+
+                stage="rag_abstention",
+
+                triage=final_triage,
+
+                retrieval_results=results,
+
+                rag_reason=generated.get(
+                    "reason"
+                )
+            )
+        )
+
+
+        return {
+
+            "query":
+                query,
+
+            "route":
+                "human",
+
+            "stage":
+                "rag_abstention",
+
+            "retrieval_performed":
+                True,
+
+            "answer_generated":
+                True,
+
+            "triage":
+                serialize_triage(
+                    final_triage
+                ),
+
+            "answer":
+                None,
+
+            "citations":
+                generated.get(
+                    "cited_sections",
+                    []
+                ),
+
+            "rag_reason":
+                generated.get(
+                    "reason"
+                ),
+
+            "results":
+                serialized_results,
+
+            "escalation":
+                escalation,
+
+            "action":
+                (
+                    "AI abstained. Forward "
+                    "escalation payload to "
+                    "Node.js/MongoDB."
+                )
+        }
+
+
+    # ==============================================
+    # 6. AI RESOLUTION
+    # ==============================================
+
+    return {
+
+        "query":
+            query,
+
+        "route":
+            "ai",
+
+        "stage":
+            "resolved",
+
+        "retrieval_performed":
+            True,
+
+        "answer_generated":
+            True,
+
+        "triage":
+            serialize_triage(
+                final_triage
+            ),
+
+        "answer":
+            generated.get(
+                "answer"
+            ),
+
+        "citations":
+            generated.get(
+                "cited_sections",
+                []
+            ),
+
+        "rag_reason":
+            generated.get(
+                "reason"
+            ),
+
+        "results":
+            serialized_results,
+
+        "escalation":
+            None,
+
+        "action":
+            (
+                "Return source-grounded "
+                "answer to user."
+            )
     }
